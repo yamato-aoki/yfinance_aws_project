@@ -1,0 +1,6 @@
+# Lambda requirements
+# yfinance はデプロイパッケージまたは Lambda Layer に含める必要があります
+
+yfinance==0.2.32
+pandas>=2.0.0
+requests>=2.31.0

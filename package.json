@@ -1,0 +1,36 @@
+{
+  "name": "yfinance-aws-project",
+  "version": "0.1.0",
+  "description": "AWS CDK project for stock price data pipeline with yfinance",
+  "bin": {
+    "yfinance-aws-project": "bin/stock-etl.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "cdk": "cdk",
+    "deploy": "cdk deploy --all",
+    "deploy:s3": "cdk deploy S3Stack",
+    "deploy:aurora": "cdk deploy AuroraStack",
+    "deploy:lambda": "cdk deploy LambdaStack",
+    "deploy:glue": "cdk deploy GlueStack",
+    "deploy:athena": "cdk deploy AthenaStack",
+    "diff": "cdk diff",
+    "synth": "cdk synth"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "20.11.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "aws-cdk": "2.120.0",
+    "ts-node": "^10.9.1",
+    "typescript": "~5.3.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.120.0",
+    "constructs": "^10.0.0",
+    "source-map-support": "^0.5.21"
+  }
+}
