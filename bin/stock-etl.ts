@@ -8,30 +8,42 @@ import { LambdaStack } from '../lib/lambda-stack';
 import { SchedulerStack } from '../lib/scheduler-stack';
 import { GlueStack } from '../lib/glue-stack';
 import { AthenaStack } from '../lib/athena-stack';
+import { DynamoDBStack } from '../lib/dynamodb-stack';
+import { LambdaTransformStack } from '../lib/lambda-transform-stack';
 
 /**
  * stock-etl.ts: AWS CDKアプリケーションのエントリーポイント
  * 
- * このファイルでは7つのスタックを作成し、依存関係を設定します:
+ * このファイルでは2つの構成を切り替えられます:
+ * 
+ * 【構成A: 有料版】Aurora + Glue ETL Job（実務パターン）
+ * - コスト: Aurora ~$100/月 + Glue ~$10/実行
+ * - 用途: 大規模データ処理、本番環境
+ * 
+ * 【構成B: 無料版】DynamoDB + Lambda（学習・検証用）
+ * - コスト: 無料枠内で運用可能
+ * - 用途: 学習、小規模データ処理
  * 
  * スタック構成:
- * 1. S3Stack: データ保存用バケット（基礎インフラ）
- * 2. IamStack: IAMロールと権限設定
- * 3. AuroraStack: マスターデータ用データベース
- * 4. LambdaStack: yfinanceデータ取得関数
- * 5. SchedulerStack: 定期実行スケジューラー
- * 6. GlueStack: ETLジョブとデータカタログ
- * 7. AthenaStack: データ分析環境
+ * 1. S3Stack: データ保存用バケット（共通）
+ * 2. IamStack: IAMロールと権限設定（共通）
+ * 3. LambdaStack: yfinanceデータ取得関数（共通）
+ * 4. SchedulerStack: 定期実行スケジューラー（共通）
  * 
- * 依存関係:
- * S3Stack → IamStack → LambdaStack/AuroraStack → GlueStack → AthenaStack
- *                          ↓
- *                    SchedulerStack
+ * 【有料版のみ】
+ * 5. AuroraStack: マスターデータ用データベース
+ * 6. GlueStack: ETLジョブとデータカタログ
+ * 
+ * 【無料版のみ】
+ * 5. DynamoDBStack: マスターデータ用テーブル
+ * 6. LambdaTransformStack: CSV→Parquet変換関数
+ * 
+ * 【共通】
+ * 7. AthenaStack: データ分析環境
  * 
  * デプロイ方法:
  * - 全スタック: npx cdk deploy --all
  * - 個別スタック: npx cdk deploy <StackName>
- * - 推奨順序: S3 → IAM → Lambda → Aurora → Glue → Athena
  */
 
 const app = new cdk.App();
@@ -51,6 +63,13 @@ const env = {
 // プロジェクト名と取得対象銘柄の定義
 const projectName = 'YFinanceStockETL';
 const stockTickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']; // デフォルトの銘柄リスト（必要に応じて変更可能）
+
+// ========================================
+// 構成選択（有料版 or 無料版）
+// ========================================
+// true: DynamoDB + Lambda（無料枠）
+// false: Aurora + Glue ETL Job（有料）
+const useFreeTier = true;
 
 // ========================================
 // 1. S3バケットスタック
@@ -76,18 +95,7 @@ const iamStack = new IamStack(app, 'IamStack', {
 });
 
 // ========================================
-// 3. Auroraスタック
-// ========================================
-// 株式マスターデータ用のServerless v2クラスターを作成
-// VPC、セキュリティグループ、Secrets Managerも含む
-const auroraStack = new AuroraStack(app, 'AuroraStack', {
-  env,
-  stackName: `${projectName}-AuroraStack`,
-  description: 'Aurora cluster for stock master data',
-});
-
-// ========================================
-// 4. Lambdaスタック
+// 3. Lambdaスタック（共通）
 // ========================================
 // yfinanceから株式データを取得する関数を作成
 // 毎日前日の株価データをS3に保存
@@ -101,7 +109,7 @@ const lambdaStack = new LambdaStack(app, 'LambdaStack', {
 });
 
 // ========================================
-// 5. Schedulerスタック
+// 4. Schedulerスタック（共通）
 // ========================================
 // EventBridge Schedulerで毎日定時にLambdaを実行
 // デフォルトでは無効（コスト節約のため）
@@ -114,24 +122,93 @@ const schedulerStack = new SchedulerStack(app, 'SchedulerStack', {
 });
 
 // ========================================
-// 6. Glueスタック
+// 構成分岐: 有料版 or 無料版
 // ========================================
-// CSV→Parquet変換とAuroraマスターJOINを行うETLジョブ
-// Glue Database、Crawler、オプションでS3イベント通知も含む
-const glueStack = new GlueStack(app, 'GlueStack', {
-  env,
-  stackName: `${projectName}-GlueStack`,
-  description: 'Glue database, ETL job, and crawler for stock data processing',
-  rawBucket: s3Stack.rawBucket,
-  processedBucket: s3Stack.processedBucket,
-  glueRole: iamStack.glueRole,
-  auroraCluster: auroraStack.cluster,
-  auroraSecret: auroraStack.databaseCredentials,
-  s3EventNotificationEnabled: false, // 学習環境では無効、手動実行を推奨
-});
+let glueDatabase: any;
+let glueCrawler: any;
+
+if (useFreeTier) {
+  // ========================================
+  // 【無料版】DynamoDB + Lambda構成
+  // ========================================
+  console.log('Using FREE-TIER configuration: DynamoDB + Lambda');
+  
+  // 5-A. DynamoDBスタック
+  const dynamodbStack = new DynamoDBStack(app, 'DynamoDBStack', {
+    env,
+    stackName: `${projectName}-DynamoDBStack`,
+    description: 'DynamoDB table for stock master data (free-tier)',
+  });
+  
+  // 6-A. Lambda変換スタック
+  const lambdaTransformStack = new LambdaTransformStack(app, 'LambdaTransformStack', {
+    env,
+    stackName: `${projectName}-LambdaTransformStack`,
+    description: 'Lambda function to transform CSV to Parquet with DynamoDB join (free-tier)',
+    rawBucket: s3Stack.rawBucket,
+    processedBucket: s3Stack.processedBucket,
+    stockMasterTable: dynamodbStack.stockMasterTable,
+    s3EventEnabled: false, // デフォルト無効
+  });
+  
+  // 依存関係
+  dynamodbStack.addDependency(s3Stack);
+  lambdaTransformStack.addDependency(dynamodbStack);
+  
+  // Glue Crawler（カタログ用、Jobは不要）
+  const glueStack = new GlueStack(app, 'GlueStack', {
+    env,
+    stackName: `${projectName}-GlueStack`,
+    description: 'Glue database and crawler for stock data catalog (free-tier, no ETL job)',
+    rawBucket: s3Stack.rawBucket,
+    processedBucket: s3Stack.processedBucket,
+    glueRole: iamStack.glueRole,
+    // Aurora関連は不要（DynamoDB使用）
+    auroraCluster: undefined as any,
+    auroraSecret: undefined as any,
+    s3EventNotificationEnabled: false,
+  });
+  
+  glueStack.addDependency(lambdaTransformStack);
+  glueDatabase = glueStack.glueDatabase;
+  glueCrawler = glueStack.glueCrawler;
+  
+} else {
+  // ========================================
+  // 【有料版】Aurora + Glue ETL Job構成
+  // ========================================
+  console.log('Using PAID configuration: Aurora + Glue ETL Job');
+  
+  // 5-B. Auroraスタック
+  const auroraStack = new AuroraStack(app, 'AuroraStack', {
+    env,
+    stackName: `${projectName}-AuroraStack`,
+    description: 'Aurora cluster for stock master data (paid)',
+  });
+  
+  // 6-B. Glueスタック
+  const glueStack = new GlueStack(app, 'GlueStack', {
+    env,
+    stackName: `${projectName}-GlueStack`,
+    description: 'Glue database, ETL job, and crawler for stock data processing (paid)',
+    rawBucket: s3Stack.rawBucket,
+    processedBucket: s3Stack.processedBucket,
+    glueRole: iamStack.glueRole,
+    auroraCluster: auroraStack.cluster,
+    auroraSecret: auroraStack.databaseCredentials,
+    s3EventNotificationEnabled: false,
+  });
+  
+  // 依存関係
+  glueStack.addDependency(iamStack);
+  glueStack.addDependency(auroraStack);
+  
+  glueDatabase = glueStack.glueDatabase;
+  glueCrawler = glueStack.glueCrawler;
+}
 
 // ========================================
-// 7. Athenaスタック
+// 7. Athenaスタック（共通）
 // ========================================
 // データ分析用のWorkGroupとNamed Queriesを作成
 // QuickSightやSQLクライアントからクエリを実行可能
@@ -140,21 +217,16 @@ const athenaStack = new AthenaStack(app, 'AthenaStack', {
   stackName: `${projectName}-AthenaStack`,
   description: 'Athena workgroup and views for stock data analysis',
   processedBucket: s3Stack.processedBucket,
-  glueDatabase: glueStack.glueDatabase,
-  glueCrawler: glueStack.glueCrawler,
+  glueDatabase: glueDatabase,
+  glueCrawler: glueCrawler,
 });
 
 // ========================================
-// スタック間の依存関係設定
+// 共通の依存関係設定
 // ========================================
-// CloudFormationが正しい順序でスタックをデプロイするように依存関係を明示
-// 依存チェーン: S3 → IAM → Lambda/Aurora → Glue → Athena
 iamStack.addDependency(s3Stack);
 lambdaStack.addDependency(iamStack);
 schedulerStack.addDependency(lambdaStack);
-glueStack.addDependency(iamStack);
-glueStack.addDependency(auroraStack);
-athenaStack.addDependency(glueStack);
 
 // ========================================
 // タグ付け

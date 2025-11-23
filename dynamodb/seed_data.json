@@ -1,0 +1,42 @@
+[
+  {
+    "ticker": "AAPL",
+    "name": "Apple Inc.",
+    "sector": "Technology",
+    "exchange": "NASDAQ",
+    "country": "US",
+    "is_active": true
+  },
+  {
+    "ticker": "GOOGL",
+    "name": "Alphabet Inc.",
+    "sector": "Technology",
+    "exchange": "NASDAQ",
+    "country": "US",
+    "is_active": true
+  },
+  {
+    "ticker": "MSFT",
+    "name": "Microsoft Corporation",
+    "sector": "Technology",
+    "exchange": "NASDAQ",
+    "country": "US",
+    "is_active": true
+  },
+  {
+    "ticker": "TSLA",
+    "name": "Tesla Inc.",
+    "sector": "Automotive",
+    "exchange": "NASDAQ",
+    "country": "US",
+    "is_active": true
+  },
+  {
+    "ticker": "AMZN",
+    "name": "Amazon.com Inc.",
+    "sector": "Consumer_Cyclical",
+    "exchange": "NASDAQ",
+    "country": "US",
+    "is_active": true
+  }
+]
