@@ -1,9 +1,11 @@
 # yfinance AWS Data Pipeline Project
 
-AWS CDK (TypeScript) を使用して構築する株価データパイプライン学習用のプロジェクトです。
-・無課金で学習可能な「DynamoDB + Lambda」構成
-・実務を想定した「Aurora + Glue ETL」構成
-以上の2パターンを用意。
+AWS CDK (TypeScript) を使用して構築する株価データパイプライン学習プロジェクト。
+
+- 無課金で学習可能な「DynamoDB + Lambda」構成
+- 実務を想定した「Aurora + Glue ETL」構成
+
+2パターンを用意し、データレイク & ETL の基礎から応用まで学習できます。
 
 [![CDK Version](https://img.shields.io/badge/AWS_CDK-2.120.0-orange)](https://github.com/aws/aws-cdk)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3.0-blue)](https://www.typescriptlang.org/)
@@ -118,13 +120,13 @@ graph TB
 
 | ステップ | 無課金構成 | 有料構成 |
 |:--------:|:----------:|:--------:|
-| 1. データ取得 | Lambda (yfinance) から株価データを取得 || 
-| 2. Raw保存 | S3 Raw に CSV 形式で保存 ||
+| 1. データ取得 | Lambda (yfinance) から株価データを取得 |〃| 
+| 2. Raw保存 | S3 Raw に CSV 形式で保存 |〃|
 | 3. 変換処理起動 | **Lambda Transform** が自動起動 | **Glue ETL Job** が自動起動 |
 | 4. マスター JOIN | **DynamoDB マスター**と JOIN | **Aurora マスター**と JOIN |
-| 5. 変換・保存 | セクター階層パーティションで Parquet 形式に変換 → S3 Processed ||
-| 6. カタログ化 | Glue Crawler がスキーマを検出 ||
-| 7. 分析 | Athena でセクター別 SQL 分析 ||
+| 5. 変換・保存 | セクター階層パーティションで Parquet 形式に変換 → S3 Processed |〃|
+| 6. カタログ化 | Glue Crawler がスキーマを検出 |〃|
+| 7. 分析 | Athena でセクター別 SQL 分析 |〃|
 
 > **注:** S3イベント通知による自動起動は実装済みですが、デフォルトでは無効（コスト削減のため）
 
