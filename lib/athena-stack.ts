@@ -115,46 +115,19 @@ WHERE year >= 2024;
       workGroup: workgroup.name,
     });
 
-    // Query 2: Techセクターの日次集計ビュー
-    // 特定セクターの株価動向を分析するためのテンプレート
-    new athena.CfnNamedQuery(this, 'TechSectorViewQuery', {
-      name: 'tech_sector_daily_summary',
-      description: 'Daily summary for Tech sector stocks',
+    // Query 2: セクター別ビュー（パーティションプルーニング活用）
+    // sector階層パーティションを活用した効率的なクエリ
+    new athena.CfnNamedQuery(this, 'SectorViewQuery', {
+      name: 'sector_wise_view',
+      description: 'View stocks by sector using partition pruning for cost optimization',
       database: props.glueDatabase.ref,
       queryString: `
--- Tech sector daily summary
--- Adjust ticker list based on your master data
+-- セクター別ビュー（Technology セクターの例）
+-- sector パーティションを使用することでスキャン量を削減
 
-CREATE OR REPLACE VIEW tech_sector_daily AS
+CREATE OR REPLACE VIEW technology_sector_stocks AS
 SELECT 
-  date,
-  COUNT(DISTINCT ticker) as num_stocks,
-  AVG(close) as avg_close_price,
-  SUM(volume) as total_volume,
-  MIN(low) as min_price,
-  MAX(high) as max_price
-FROM stock_data
-WHERE ticker IN ('AAPL', 'MSFT', 'GOOGL')  -- Tech sector tickers
-  AND year >= 2024
-GROUP BY date
-ORDER BY date DESC;
-      `.trim(),
-      workGroup: workgroup.name,
-    });
-
-    // Query 3: セクター別UNION ALLビューテンプレート
-    // QuickSightで複数セクターを一括でクエリするためのパターン
-    new athena.CfnNamedQuery(this, 'SectorUnionViewQuery', {
-      name: 'sector_wise_union_template',
-      description: 'Template for creating sector-wise UNION ALL views',
-      database: props.glueDatabase.ref,
-      queryString: `
--- Sector-wise union template (Tech sector example)
--- This allows QuickSight to query all Tech sector stocks as a single dataset
-
-CREATE OR REPLACE VIEW tech_sector_all_stocks AS
-SELECT 
-  'Tech' as sector,
+  sector,
   ticker,
   date,
   year,
@@ -165,41 +138,77 @@ SELECT
   low,
   close,
   volume,
-  ingested_at
+  exchange,
+  country
 FROM stock_data
-WHERE ticker IN ('AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA')
-  AND year >= 2024
+WHERE sector = 'Technology'  -- パーティションプルーニングが働く
+  AND year >= 2024;
 
-UNION ALL
-
--- Add more sectors as needed
--- SELECT 'Finance' as sector, ticker, date, ... FROM stock_data WHERE ticker IN (...)
-;
+-- 使い方:
+-- SELECT * FROM technology_sector_stocks WHERE ticker = 'AAPL';
       `.trim(),
       workGroup: workgroup.name,
     });
 
-    // Query 4: 月次集計クエリ
-    // 銘柄ごとの月次統計を集計するテンプレート
-    new athena.CfnNamedQuery(this, 'MonthlyAggregationQuery', {
-      name: 'monthly_stock_summary',
-      description: 'Monthly aggregation of stock prices',
+    // Query 3: セクター別日次集計
+    // 各セクターの日次統計を集計（IoTデバイス別集計と同じパターン）
+    new athena.CfnNamedQuery(this, 'SectorDailySummaryQuery', {
+      name: 'sector_daily_summary',
+      description: 'Daily summary by sector (similar to IoT device aggregation pattern)',
       database: props.glueDatabase.ref,
       queryString: `
--- Monthly summary by ticker
+-- セクター別日次集計（IoT実装パターン）
+-- region/device/timestamp と同じ階層構造
+
 SELECT 
-  ticker,
-  year,
-  month,
-  COUNT(*) as trading_days,
-  AVG(close) as avg_close,
-  MIN(low) as month_low,
-  MAX(high) as month_high,
-  SUM(volume) as total_volume
+  sector,
+  date,
+  COUNT(DISTINCT ticker) as num_stocks,
+  AVG(close) as avg_close_price,
+  SUM(volume) as total_volume,
+  MIN(low) as sector_min_price,
+  MAX(high) as sector_max_price,
+  STDDEV(close) as price_volatility
 FROM stock_data
-WHERE year >= 2024
-GROUP BY ticker, year, month
-ORDER BY ticker, year DESC, month DESC;
+WHERE year = 2024
+  AND month = '11'
+GROUP BY sector, date
+ORDER BY sector, date DESC;
+
+-- 特定セクターのみ集計（パーティションプルーニング）
+-- WHERE sector = 'Technology' を追加すると他セクターはスキャンされない
+      `.trim(),
+      workGroup: workgroup.name,
+    });
+
+    // Query 4: セクター間比較クエリ（QuickSight向け）
+    // 複数セクターのパフォーマンスを比較
+    new athena.CfnNamedQuery(this, 'SectorComparisonQuery', {
+      name: 'sector_comparison',
+      description: 'Compare performance across sectors for QuickSight dashboards',
+      database: props.glueDatabase.ref,
+      queryString: `
+-- セクター間パフォーマンス比較
+-- QuickSightでセクター別ダッシュボードを作成する際に使用
+
+SELECT 
+  sector,
+  COUNT(DISTINCT ticker) as num_companies,
+  AVG(close) as avg_price,
+  AVG(volume) as avg_volume,
+  SUM(volume) as total_volume,
+  MIN(date) as data_start_date,
+  MAX(date) as data_end_date,
+  COUNT(*) as total_records
+FROM stock_data
+WHERE year = 2024
+GROUP BY sector
+ORDER BY total_volume DESC;
+
+-- 使用例:
+-- 1. Technology vs Consumer_Cyclical の比較
+-- 2. 各セクターの取引量ランキング
+-- 3. QuickSightでセクター別KPIダッシュボード作成
       `.trim(),
       workGroup: workgroup.name,
     });

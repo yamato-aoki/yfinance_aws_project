@@ -10,7 +10,7 @@ AWS Glue ETL Job: Stock Data CSV to Parquet Converter
     5. S3 processedバケットにパーティション化して保存
 
 パーティション構造:
-    processed/ticker={ticker}/year={YYYY}/month={MM}/day={DD}/
+    processed/sector={sector}/ticker={ticker}/year={YYYY}/month={MM}/day={DD}/
 
 必要なGlueジョブパラメータ:
     --RAW_BUCKET: 生データバケット名
@@ -126,11 +126,12 @@ def get_aurora_master_data():
         # Auroraからstocksテーブルを読み込み
         # ========================================
         # JDBCを使用してAuroraのテーブルをSpark DataFrameとして読み込み
+        # sector列を含む銘柄マスターデータを取得（パーティションキーとして使用）
         master_df = spark.read.jdbc(
             url=jdbc_url,
             table="stocks",  # sql/create_stocks_table.sqlで作成したテーブル
             properties=connection_properties
-        )
+        ).select("ticker", "sector", "exchange", "country")  # 必要なカラムのみ選択
         
         logger.info(f"Loaded {master_df.count()} records from Aurora master table")
         return master_df
@@ -197,7 +198,41 @@ try:
     )
     
     # ----------------------------------------
-    # 5-2. Glue処理日時を追加
+    # 5-2. Auroraマスターデータとのレフトジョイン
+    # ----------------------------------------
+    # 銘柄マスターからsector, exchange, country情報を付与
+    master_df = get_aurora_master_data()
+    
+    if master_df is not None:
+        logger.info("Joining with Aurora master data...")
+        # tickerカラムでレフトジョイン（株価データにマスター情報を付与）
+        df_transformed = df_transformed.join(
+            master_df,
+            on="ticker",
+            how="left"  # 株価データを全て保持、マスターデータがない場合はNULL
+        )
+        logger.info("Master data join completed")
+    else:
+        # マスターデータがない場合はデフォルト値を設定
+        logger.warn("No master data available, using default sector='Unknown'")
+        df_transformed = df_transformed.withColumn("sector", F.lit("Unknown"))
+        df_transformed = df_transformed.withColumn("exchange", F.lit(None).cast(StringType()))
+        df_transformed = df_transformed.withColumn("country", F.lit(None).cast(StringType()))
+    
+    # NULLのsectorを"Unknown"に置換（JOINできなかった銘柄対策）
+    df_transformed = df_transformed.withColumn(
+        "sector",
+        F.when(F.col("sector").isNull(), "Unknown").otherwise(F.col("sector"))
+    )
+    
+    # スペースをアンダースコアに置換（パーティション名に使用するため）
+    df_transformed = df_transformed.withColumn(
+        "sector",
+        F.regexp_replace(F.col("sector"), " ", "_")
+    )
+    
+    # ----------------------------------------
+    # 5-3. Glue処理日時を追加
     # ----------------------------------------
     # ETL実行時刻を記録（データ系統管理のため）
     df_transformed = df_transformed.withColumn(
@@ -206,7 +241,7 @@ try:
     )
     
     # ----------------------------------------
-    # 5-3. 元ファイル名を追加
+    # 5-4. 元ファイル名を追加
     # ----------------------------------------
     # トレーサビリティのためソースファイル名を記録
     if s3_input_path:
@@ -220,52 +255,22 @@ try:
     )
     
     # ----------------------------------------
-    # 5-4. AuroraマスターデータとのJOIN
-    # ----------------------------------------
-    # 銘柄情報（sector, exchange, country）を付与
-    master_df = get_aurora_master_data()
-    
-    if master_df is not None:
-        # マスターデータから必要なカラムのみを選択
-        master_selected = master_df.select(
-            "ticker",
-            F.col("sector").alias("sector"),       # 業種
-            F.col("exchange").alias("exchange"),   # 取引所
-            F.col("country").alias("country")      # 国
-        )
-        
-        # LEFT JOIN: マスターデータがない銘柄もNULLとして残す
-        df_transformed = df_transformed.join(
-            master_selected,
-            on="ticker",
-            how="left"
-        )
-        
-        logger.info("Joined with Aurora master data")
-    else:
-        # マスターデータが取得できない場合はダミーカラムを追加
-        # これによりスキーマ一貫性を保つ
-        df_transformed = df_transformed \
-            .withColumn("sector", F.lit(None).cast(StringType())) \
-            .withColumn("exchange", F.lit(None).cast(StringType())) \
-            .withColumn("country", F.lit(None).cast(StringType()))
-    
-    # ----------------------------------------
     # 5-5. 最終的なカラム順序を整理
     # ----------------------------------------
     # Athenaでのクエリ効率を考慮してカラム順を最適化
+    # sector, tickerをパーティションキーとして先頭に配置
     df_final = df_transformed.select(
-        "ticker",      # 銘柄コード
+        "sector",      # 業種（パーティションキー1）
+        "ticker",      # 銘柄コード（パーティションキー2）
+        "year",        # 年（パーティションキー3）
+        "month",       # 月（パーティションキー4）
+        "day",         # 日（パーティションキー5）
         "date",        # 日付（文字列）
-        "year",        # 年（パーティションキー）
-        "month",       # 月（パーティションキー）
-        "day",         # 日（パーティションキー）
         F.col("open").cast(DoubleType()),    # 始値
         F.col("high").cast(DoubleType()),    # 高値
         F.col("low").cast(DoubleType()),     # 安値
         F.col("close").cast(DoubleType()),   # 終値
         F.col("volume").cast(IntegerType()), # 出来高
-        "sector",      # 業種（マスターから付与）
         "exchange",    # 取引所（マスターから付与）
         "country",     # 国（マスターから付与）
         "ingested_at", # ETL処理日時
@@ -277,19 +282,23 @@ try:
     df_final.show(5)  # 先頭5件をCloudWatch Logsに出力
     
     # ========================================
-    # 6. Parquet形式でS3に出力
+    # 6. Parquet形式でS3に出力（セクター階層パーティション）
     # ========================================
-    # パーティション構造: processed/ticker={ticker}/year={YYYY}/month={MM}/day={DD}/
-    # この構造によりAthenaのクエリパフォーマンスが向上
+    # パーティション構造: processed/sector={sector}/ticker={ticker}/year={YYYY}/month={MM}/day={DD}/
+    # IoTパターン: region={region}/device={device}/timestamp={ts} と同じ階層構造
+    # この構造により「WHERE sector='Technology'」のクエリで他セクターはスキャンされない
     output_path = f"s3://{args['PROCESSED_BUCKET']}/processed/"
     
     logger.info(f"Writing Parquet to: {output_path}")
+    logger.info("Partition structure: sector/ticker/year/month/day")
     
     # Parquetで出力
     # - mode="append": 既存データに追加（上書きしない）
-    # - partitionBy: 指定カラムでディレクトリを分割
+    # - partitionBy: 階層パーティション（sector → ticker → year → month → day）
     # - compression="snappy": Snappy圧縮を使用（読み書き速度とサイズのバランスが良い）
-    df_final.write.mode("append").partitionBy("ticker", "year", "month", "day").parquet(
+    df_final.write.mode("append").partitionBy(
+        "sector", "ticker", "year", "month", "day"
+    ).parquet(
         output_path,
         compression="snappy"  # 他の選択肢: gzip（圧縮率高）, none（圧縮なし）
     )
