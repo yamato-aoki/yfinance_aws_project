@@ -75,16 +75,19 @@ graph TD
 
 ## データフロー
 
-| ステップ | 低コスト構成 | 本番構成 |
-|---------|------------|-----------|
-| 1. 取得 | Lambda (yfinance) | 〃 |
-| 2. 受入用保存 | S3(CSV) | 〃 |
-| 3. 変換 | **Lambda Transform** | **Glue ETL Job** |
-| 4. JOIN | DynamoDB | Aurora |
-| 5. 参照用保存 | S3（Parquet + パーティション） | 〃 |
-| 6. カタログ化 | Glue Crawler | 〃 |
-| 7. 分析 | Athena | 〃 |
-| 8. **集計ビュー自動生成** | **Lambda → Athena CTAS（自動）** | 〃 |
+### 共通パイプライン
+1. **データ取得**: Lambda (yfinance) → S3 Raw (CSV)
+2. **変換処理**: マスターJOIN → Parquet変換
+3. **カタログ化**: Glue Crawler → Athena
+4. **集計ビュー**: Lambda → Athena CTAS → S3 Curated
+
+### 構成による違い
+
+| 処理 | 低コスト構成 | 本番構成 |
+|------|-------------|----------|
+| **マスターDB** | DynamoDB (無料枠) | Aurora Serverless v2 |
+| **変換処理** | Lambda Transform | Glue ETL Job |
+| **月額コスト** | **$0** | **$100+** |
 
 ### Curated ビュー自動生成の仕組み
 
