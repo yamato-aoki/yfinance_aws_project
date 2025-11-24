@@ -1,21 +1,33 @@
-# DynamoDB シードデータ投入方法
+# DynamoDB マスターデータ
 
-## 前提条件
-- DynamoDBStackがデプロイ済みであること
-- AWS CLI設定済み
+## 概要
 
-## 投入方法
+このディレクトリには DynamoDB 用の銘柄マスターデータが含まれています。
 
-### 方法1: Node.jsスクリプト（推奨）
+## データファイル
+
+- `seed_data.json`: 5銘柄のマスターデータ（AAPL, GOOGL, MSFT, TSLA, AMZN）
+
+## データ投入方法
+
+### 自動投入（推奨）
+
+**CDK デプロイ時に自動的にデータが投入されます。**
 
 ```bash
-node scripts/seed-dynamodb.js
+cdk deploy --all
 ```
 
-### 方法2: AWS CLI
+**理由:**
+- `DynamoDBStack` の `CustomResource` が自動実行
+- 手動スクリプト実行不要
+- スタック削除時にデータも自動削除（クリーンアップ容易）
+
+### 手動投入（トラブルシューティング用）
+
+CDK デプロイ後に手動でデータを追加・更新する場合:
 
 ```bash
-# 1ファイルずつ投入
 aws dynamodb put-item \
   --table-name stock-master \
   --item '{
@@ -28,11 +40,16 @@ aws dynamodb put-item \
   }'
 ```
 
-### 方法3: AWS Console
-1. DynamoDBコンソールを開く
-2. テーブル `stock-master` を選択
-3. 「項目を作成」をクリック
-4. `dynamodb/seed_data.json` の内容を手動で入力
+## データ構造
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| ticker | String (PK) | 銘柄コード |
+| name | String | 会社名 |
+| sector | String | セクター |
+| exchange | String | 取引所 |
+| country | String | 国 |
+| is_active | Boolean | アクティブフラグ |
 
 ## データ確認
 

@@ -1,6 +1,10 @@
 import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as cr from 'aws-cdk-lib/custom-resources';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * DynamoDBStack: 銘柄マスターデータ用テーブル（無課金構成用）
@@ -53,6 +57,47 @@ export class DynamoDBStack extends cdk.Stack {
       value: this.stockMasterTable.tableArn,
       description: 'DynamoDB table ARN',
       exportName: 'StockMasterTableArn',
+    });
+
+    // ========================================
+    // シードデータ自動投入（CustomResource）
+    // ========================================
+    // デプロイ時に自動的にマスターデータを投入
+    // 理由:
+    // 1. 手動スクリプト実行が不要になり、デプロイが完全自動化
+    // 2. スタック削除時にデータも自動削除される（クリーンアップ容易）
+    // 3. 初回デプロイ後すぐにパイプラインが動作可能
+    
+    const seedData = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '../dynamodb/seed_data.json'), 'utf8')
+    );
+
+    // 各銘柄データを投入
+    seedData.forEach((item: any, index: number) => {
+      new cr.AwsCustomResource(this, `SeedData-${item.ticker}`, {
+        onCreate: {
+          service: 'DynamoDB',
+          action: 'putItem',
+          parameters: {
+            TableName: this.stockMasterTable.tableName,
+            Item: {
+              ticker: { S: item.ticker },
+              name: { S: item.name },
+              sector: { S: item.sector },
+              exchange: { S: item.exchange },
+              country: { S: item.country },
+              is_active: { BOOL: item.is_active },
+            },
+          },
+          physicalResourceId: cr.PhysicalResourceId.of(`seed-${item.ticker}-${Date.now()}`),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromStatements([
+          new iam.PolicyStatement({
+            actions: ['dynamodb:PutItem'],
+            resources: [this.stockMasterTable.tableArn],
+          }),
+        ]),
+      });
     });
   }
 }

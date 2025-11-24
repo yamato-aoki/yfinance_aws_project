@@ -158,9 +158,11 @@ yfinance_aws_project/
 
 ## 使い方
 
-### 1. デプロイ
+### 低コスト構成（DynamoDB + Lambda）
 
-低コスト構成：
+**デフォルト構成 - 推奨**
+
+#### 1. デプロイ
 
 ```bash
 npm install
@@ -168,23 +170,72 @@ cdk bootstrap
 cdk deploy --all
 ```
 
-### 2. シードデータ（DynamoDB）
+**理由:** シードデータは CDK で自動投入されるため、デプロイ後すぐに利用可能
+
+#### 2. データパイプライン実行
 
 ```bash
-node scripts/seed-dynamodb.js
-```
-
-### 3. 手動実行
-
-```bash
+# 株価データ取得
 aws lambda invoke --function-name FetchStockDataFunction response.json
+
+# CSV→Parquet 変換
 aws lambda invoke --function-name TransformCSVtoParquetFunction response.json
+
+# カタログ化
 aws glue start-crawler --name stock-data-processed-crawler
 ```
 
-### 4. Curated ビュー作成（オプション）
+#### 3. Curated ビュー作成（オプション）
 
-セクター別集計や月次サマリーを作成：
+```bash
+node scripts/create-curated-views.js
+```
+
+---
+
+### 本番構成（Aurora + Glue）
+
+**コスト: ~$100/月 + 実行コスト**
+
+#### 1. 構成切り替え
+
+[`bin/stock-etl.ts` L72](./bin/stock-etl.ts#L72) を編集：
+
+```ts
+const useFreeTier = false;  // true → false に変更
+```
+
+#### 2. デプロイ
+
+```bash
+cdk deploy --all
+```
+
+#### 3. Aurora マスターデータ初期化
+
+**理由:** Aurora は SQL 実行が必要なため手動セットアップ
+
+```bash
+# VPC 内から実行、または Bastion 経由
+mysql -h <aurora-endpoint> -u admin -p stock_data_db < sql/aurora_setup.sql
+```
+
+または AWS Console → RDS → Query Editor で [`sql/aurora_setup.sql`](./sql/aurora_setup.sql) を実行
+
+#### 4. データパイプライン実行
+
+```bash
+# 株価データ取得
+aws lambda invoke --function-name FetchStockDataFunction response.json
+
+# Glue ETL Job 実行
+aws glue start-job-run --job-name stock-etl-job
+
+# カタログ化
+aws glue start-crawler --name stock-data-processed-crawler
+```
+
+#### 5. Curated ビュー作成（オプション）
 
 ```bash
 node scripts/create-curated-views.js
