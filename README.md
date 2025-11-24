@@ -23,7 +23,7 @@ AWS CDK (TypeScript) を使用して構築する **株価データパイプラ�
 - [データレイク3層構造](#データレイク3層構造)
 - [S3 Processed バケット構造](#s3-processed-バケット構造)
 - [Parquet カラム仕様](#parquet-カラム仕様)
-- [マスターデータ構造（DynamoDB/Aurora）](#マスターデータ構造dynamodbaurora)
+- [マスター（DynamoDB/Aurora）](#マスターdynamodbaurora)
 - [プロジェクト構造](#プロジェクト構造)
 - [デプロイ方法](#デプロイ方法)
 - [自動化の有効化](#自動化の有効化)
@@ -123,7 +123,9 @@ s3://参照用バケット/
             {銘柄名}{yymmdd}.parquet
 ```
 
-### Parquet カラム例
+---
+
+## Parquet カラム仕様
 
 | カラム | 説明 |
 |--------|------|
