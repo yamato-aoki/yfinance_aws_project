@@ -10,6 +10,7 @@ import { GlueStack } from '../lib/glue-stack';
 import { AthenaStack } from '../lib/athena-stack';
 import { DynamoDBStack } from '../lib/dynamodb-stack';
 import { LambdaTransformStack } from '../lib/lambda-transform-stack';
+import { LambdaCuratedStack } from '../lib/lambda-curated-stack';
 
 /**
  * stock-etl.ts: AWS CDKアプリケーションのエントリーポイント
@@ -220,6 +221,20 @@ const athenaStack = new AthenaStack(app, 'AthenaStack', {
   glueDatabase: glueDatabase,
   glueCrawler: glueCrawler,
 });
+
+// ========================================
+// 8. Lambda Curated スタック（共通）
+// ========================================
+// Processed bucket へのデータ作成時に Curated views を自動生成
+const lambdaCuratedStack = new LambdaCuratedStack(app, 'LambdaCuratedStack', {
+  env,
+  stackName: `${projectName}-LambdaCuratedStack`,
+  description: 'Lambda function to automatically create Curated views from Processed data',
+  processedBucket: s3Stack.processedBucket,
+  curatedBucket: s3Stack.curatedBucket,
+});
+
+lambdaCuratedStack.addDependency(athenaStack);
 
 // ========================================
 // 共通の依存関係設定

@@ -89,28 +89,62 @@ async function main() {
   console.log(`Curatedバケット: s3://${CURATED_BUCKET}/`);
   console.log('========================================');
 
+  const results = [];
+
   // 1. セクター別集計ビュー
   const sectorSQL = loadSQL('create_sector_view.sql');
-  const sectorSuccess = await executeQuery(sectorSQL, 'セクター別集計ビュー (sector_daily_summary)');
+  const sectorSuccess = await executeQuery(sectorSQL, 'セクター別日次集計 (sector_daily_summary)');
+  results.push({ name: 'セクター別日次集計', success: sectorSuccess });
 
   // 2. 銘柄別月次サマリー
   const tickerSQL = loadSQL('create_ticker_monthly_view.sql');
   const tickerSuccess = await executeQuery(tickerSQL, '銘柄別月次サマリー (ticker_monthly_summary)');
+  results.push({ name: '銘柄別月次サマリー', success: tickerSuccess });
+
+  // 3. セクター内パフォーマンスランキング
+  const rankingSQL = loadSQL('create_sector_ranking_view.sql');
+  const rankingSuccess = await executeQuery(rankingSQL, 'セクター内ランキング (sector_performance_ranking)');
+  results.push({ name: 'セクター内ランキング', success: rankingSuccess });
+
+  // 4. セクター間比較
+  const crossSectorSQL = loadSQL('create_cross_sector_view.sql');
+  const crossSectorSuccess = await executeQuery(crossSectorSQL, 'セクター間比較 (cross_sector_comparison)');
+  results.push({ name: 'セクター間比較', success: crossSectorSuccess });
+
+  // 5. ボラティリティ分析
+  const volatilitySQL = loadSQL('create_volatility_view.sql');
+  const volatilitySuccess = await executeQuery(volatilitySQL, 'ボラティリティ分析 (volatility_analysis)');
+  results.push({ name: 'ボラティリティ分析', success: volatilitySuccess });
 
   console.log('\n========================================');
   console.log('実行結果');
   console.log('========================================');
-  console.log(`セクター別集計ビュー: ${sectorSuccess ? '✅ 成功' : '❌ 失敗'}`);
-  console.log(`銘柄別月次サマリー: ${tickerSuccess ? '✅ 成功' : '❌ 失敗'}`);
+  
+  results.forEach(result => {
+    console.log(`${result.name}: ${result.success ? '✅ 成功' : '❌ 失敗'}`);
+  });
+  
   console.log('========================================');
   
-  if (sectorSuccess && tickerSuccess) {
+  const allSuccess = results.every(r => r.success);
+  
+  if (allSuccess) {
     console.log('\n🎉 すべてのCuratedビューが正常に作成されました！');
-    console.log(`\n📊 データ確認:
+    console.log(`\n📊 データ確認用クエリ:
     
+    -- 基本集計
     SELECT * FROM sector_daily_summary LIMIT 10;
     SELECT * FROM ticker_monthly_summary LIMIT 10;
+    
+    -- パフォーマンス分析
+    SELECT * FROM sector_performance_ranking WHERE date = (SELECT MAX(date) FROM sector_performance_ranking);
+    SELECT * FROM cross_sector_comparison ORDER BY date DESC, performance_rank LIMIT 10;
+    
+    -- リスク分析
+    SELECT * FROM volatility_analysis WHERE risk_category = 'High' ORDER BY date DESC LIMIT 10;
     `);
+  } else {
+    console.log('\n⚠️  一部のビュー作成に失敗しました。エラーログを確認してください。');
   }
 }
 

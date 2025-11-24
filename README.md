@@ -32,23 +32,30 @@ AWS CDK (TypeScript) を使用して構築する **株価データパイプラ�
 ## アーキテクチャ概要
 
 ```mermaid
-graph LR
-    Lambda[Lambda yfinance]
-    S3Raw[S3 Raw CSV]
-    Transform[Transform Lambda or Glue]
-    MasterDB[Master DB DynamoDB or Aurora]
-    S3Processed[S3 Processed Parquet]
+graph TD
+    EventBridge([EventBridge Scheduler<br/>毎日9:00 JST])
+    YFinance{{yfinance API<br/>外部データソース}}
+    Lambda[Lambda<br/>データ取得]
+    S3Raw[[S3 Raw<br/>CSV]]
+    Transform[Transform<br/>Lambda or Glue]
+    S3Processed[[S3 Processed<br/>Parquet]]
+    LambdaCurated[Lambda<br/>Curated Views自動生成]
     Crawler[Glue Crawler]
     Athena[Athena]
-    S3Curated[S3 Curated 集計ビュー]
+    S3Curated[[S3 Curated<br/>集計ビュー]]
+    MasterDB[(Master DB<br/>DynamoDB or Aurora)]
 
+    EventBridge -.->|定期実行| Lambda
+    YFinance -.->|株価データ| Lambda
     Lambda --> S3Raw
-    S3Raw --> Transform
-    MasterDB -->|JOIN| Transform
+    S3Raw -.->|CSV作成時| Transform
+    MasterDB -.->|JOIN| Transform
     Transform --> S3Processed
+    S3Processed -.->|Parquet作成時| LambdaCurated
+    LambdaCurated -->|CTAS実行| Athena
+    Athena -->|5つのビュー作成| S3Curated
     S3Processed --> Crawler
-    Crawler --> Athena
-    Athena -->|CTAS| S3Curated
+    Crawler -->|カタログ登録| Athena
 ```
 
 ---
@@ -59,9 +66,9 @@ graph LR
 |------|-----------------------|------------------------|
 | マスターDB | **DynamoDB** (無料枠) | **Aurora Serverless v2** (~$100/月) |
 | 変換処理 | **Lambda Transform** | **Glue ETL Job** (~$10/実行) |
-| スケジューラ | EventBridge（無効デプロイ） | EventBridge（必要時に有効化） |
-| カタログ | Glue Crawler | Glue Crawler |
-| 分析 | Athena | Athena |
+| スケジューラ | EventBridge（デプロイ時は無効・手動で有効化） | 〃 |
+| カタログ | Glue Crawler | 〃 |
+| 分析 | Athena | 〃 |
 | 月額概算 | **$0** | **$100+** |
 
 ---
@@ -70,14 +77,27 @@ graph LR
 
 | ステップ | 低コスト構成 | 本番構成 |
 |---------|------------|-----------|
-| 1. 取得 | Lambda (yfinance) | 同じ |
-| 2. 受入用保存 | S3(CSV) | 同じ |
+| 1. 取得 | Lambda (yfinance) | 〃 |
+| 2. 受入用保存 | S3(CSV) | 〃 |
 | 3. 変換 | **Lambda Transform** | **Glue ETL Job** |
 | 4. JOIN | DynamoDB | Aurora |
-| 5. 参照用保存 | S3（Parquet + パーティション） | 同じ |
-| 6. カタログ化 | Glue Crawler | 同じ |
-| 7. 分析 | Athena | 同じ |
-| 8. 集計ビュー作成 | Athena CTAS → S3 Curated | 同じ |
+| 5. 参照用保存 | S3（Parquet + パーティション） | 〃 |
+| 6. カタログ化 | Glue Crawler | 〃 |
+| 7. 分析 | Athena | 〃 |
+| 8. **集計ビュー自動生成** | **Lambda → Athena CTAS（自動）** | 〃 |
+
+### Curated ビュー自動生成の仕組み
+
+Processed bucket に Parquet ファイルが作成されると、S3 イベント通知により Lambda が自動起動し、5つの集計ビューを作成します。
+
+**生成されるビュー:**
+1. `sector_daily_summary` - セクター別日次サマリー
+2. `ticker_monthly_summary` - 銘柄別月次サマリー
+3. `sector_performance_ranking` - セクター内パフォーマンスランキング
+4. `cross_sector_comparison` - セクター横断比較（セクターローテーション分析）
+5. `volatility_analysis` - ボラティリティ分析（リスク指標）
+
+**コスト:** 5銘柄×365日で約100KBのParquet → 5クエリで~500KB = **$0.0025/回**（年間$0.91 ≈ 140円）
 
 ---
 
@@ -183,11 +203,29 @@ aws lambda invoke --function-name TransformCSVtoParquetFunction response.json
 
 # カタログ化
 aws glue start-crawler --name stock-data-processed-crawler
+
+# Curated ビューは自動生成されます（Processed bucket へのファイル作成時）
+# Lambda CreateCuratedViewsFunction が S3 イベント通知で自動起動
 ```
 
-#### 3. Curated ビュー作成（オプション）
+**確認方法:**
+```bash
+# Lambda 実行ログ確認
+aws logs tail /aws/lambda/CreateCuratedViewsFunction --follow
+
+# Athena でビュー確認
+aws athena start-query-execution \
+  --query-string "SELECT * FROM curated_db.sector_daily_summary LIMIT 10" \
+  --result-configuration "OutputLocation=s3://your-curated-bucket/athena-results/"
+```
+
+#### 3. 手動でビュー再作成（オプション）
 
 ```bash
+# Lambda を手動起動
+aws lambda invoke --function-name CreateCuratedViewsFunction response.json
+
+# または Node.js スクリプトで実行
 node scripts/create-curated-views.js
 ```
 
