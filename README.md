@@ -14,7 +14,7 @@ AWS CDK (TypeScript) を使用して構築する **株価データパイプラ�
 
 の **2パターン切り替え式** のアーキテクチャにしています。
 
-設定は [`bin/stock-etl.ts` L72](./bin/stock-etl.ts#L72) の `useFreeTier` フラグで切り替えできます。
+設定は [`bin/stock-etl.ts` L73](./bin/stock-etl.ts#L73) の `useFreeTier` フラグで切り替えできます。
 
 ---
 
@@ -318,5 +318,11 @@ yfinance はサンプルデータソースです。Lambda 関数を差し替え�
 - **職種**: データエンジニア
 - **専門領域**: データ基盤構築 / ETL / クラウド活用 / 再現性ある設計
 - **GitHub**: [@yamato-aoki](https://github.com/yamato-aoki)
+
+---
+
+## 学習ガイド
+
+このプロジェクトを使った効果的な学習手順は [LEARNING_ROADMAP.md](./LEARNING_ROADMAP.md) を参照してください。
 
 ---
