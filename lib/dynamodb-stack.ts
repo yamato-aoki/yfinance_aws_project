@@ -49,13 +49,13 @@ export class DynamoDBStack extends cdk.Stack {
     // ========================================
     new cdk.CfnOutput(this, 'TableName', {
       value: this.stockMasterTable.tableName,
-      description: 'DynamoDB table name for stock master data',
+      description: '株式マスターデータ用DynamoDBテーブル名',
       exportName: 'StockMasterTableName',
     });
 
     new cdk.CfnOutput(this, 'TableArn', {
       value: this.stockMasterTable.tableArn,
-      description: 'DynamoDB table ARN',
+      description: 'DynamoDBテーブルARN',
       exportName: 'StockMasterTableArn',
     });
 

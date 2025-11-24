@@ -209,7 +209,7 @@ def lambda_handler(event, context):
     S3 Processed bucket へのオブジェクト作成をトリガーに
     Curated views を自動生成する Lambda 関数
     """
-    print(f"Event: {json.dumps(event)}")
+    print(f"イベント: {json.dumps(event)}")
     
     # 環境変数から設定取得
     curated_bucket = context.function_name.split('-')[-2]  # 簡易的な取得
@@ -225,7 +225,7 @@ def lambda_handler(event, context):
         view_name = view_def['name']
         sql = view_def['sql'].format(curated_bucket=curated_bucket)
         
-        print(f"Creating view: {view_name}")
+        print(f"ビュー作成中: {view_name}")
         
         try:
             # Athena クエリ実行
@@ -236,7 +236,7 @@ def lambda_handler(event, context):
             )
             
             query_execution_id = response['QueryExecutionId']
-            print(f"Query execution ID: {query_execution_id}")
+            print(f"クエリ実行 ID: {query_execution_id}")
             
             # クエリ完了待機
             status = wait_for_query_completion(query_execution_id)
@@ -248,7 +248,7 @@ def lambda_handler(event, context):
             })
             
         except Exception as e:
-            print(f"Error creating view {view_name}: {str(e)}")
+            print(f"ビュー作成エラー {view_name}: {str(e)}")
             results.append({
                 'view_name': view_name,
                 'status': 'FAILED',
@@ -257,12 +257,12 @@ def lambda_handler(event, context):
     
     # 結果サマリー
     success_count = sum(1 for r in results if r['status'] == 'SUCCEEDED')
-    print(f"\nCompleted: {success_count}/{len(SQL_VIEWS)} views created successfully")
+    print(f"\n完了: {success_count}/{len(SQL_VIEWS)} 個のビューを作成しました")
     
     return {
         'statusCode': 200,
         'body': json.dumps({
-            'message': f'{success_count}/{len(SQL_VIEWS)} Curated views created',
+            'message': f'{success_count}/{len(SQL_VIEWS)} 個のCuratedビューを作成しました',
             'results': results
         })
     }
@@ -288,8 +288,8 @@ def wait_for_query_completion(query_execution_id: str, max_wait: int = 300) -> s
         
         if status in ['SUCCEEDED', 'FAILED', 'CANCELLED']:
             if status == 'FAILED':
-                reason = response['QueryExecution']['Status'].get('StateChangeReason', 'Unknown')
-                print(f"Query failed: {reason}")
+                reason = response['QueryExecution']['Status'].get('StateChangeReason', '不明')
+                print(f"クエリ失敗: {reason}")
             return status
         
         time.sleep(2)

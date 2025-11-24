@@ -58,7 +58,7 @@ export class AthenaStack extends cdk.Stack {
     // クエリ実行環境を定義し、コスト管理とログ収集を設定
     const workgroup = new athena.CfnWorkGroup(this, 'StockDataWorkGroup', {
       name: 'stock-data-analytics',
-      description: 'Workgroup for stock data analysis with Athena',
+      description: 'Athenaによる株価データ分析用ワークグループ',
       state: 'ENABLED',
       workGroupConfiguration: {
         resultConfiguration: {
@@ -84,7 +84,7 @@ export class AthenaStack extends cdk.Stack {
     // Query 1: マスターデータとの結合ビュー
     new athena.CfnNamedQuery(this, 'StockDataWithMasterQuery', {
       name: 'stock_data_with_master',
-      description: 'Join stock data with master information from Aurora',
+      description: '株価データとマスター情報のJOIN',
       database: props.glueDatabase.ref,
       queryString: `
 -- This is a sample query. Adjust table names after Glue Crawler runs.
@@ -119,7 +119,7 @@ WHERE year >= 2024;
     // sector階層パーティションを活用した効率的なクエリ
     new athena.CfnNamedQuery(this, 'SectorViewQuery', {
       name: 'sector_wise_view',
-      description: 'View stocks by sector using partition pruning for cost optimization',
+      description: 'パーティションプルーニングによるコスト最適化セクタービュー',
       database: props.glueDatabase.ref,
       queryString: `
 -- セクター別ビュー（Technology セクターの例）
@@ -154,7 +154,7 @@ WHERE sector = 'Technology'  -- パーティションプルーニングが働く
     // 各セクターの日次統計を集計（IoTデバイス別集計と同じパターン）
     new athena.CfnNamedQuery(this, 'SectorDailySummaryQuery', {
       name: 'sector_daily_summary',
-      description: 'Daily summary by sector (similar to IoT device aggregation pattern)',
+      description: 'セクター別日次サマリー（IoTデバイス集計パターン類似）',
       database: props.glueDatabase.ref,
       queryString: `
 -- セクター別日次集計（IoT実装パターン）
@@ -185,7 +185,7 @@ ORDER BY sector, date DESC;
     // 複数セクターのパフォーマンスを比較
     new athena.CfnNamedQuery(this, 'SectorComparisonQuery', {
       name: 'sector_comparison',
-      description: 'Compare performance across sectors for QuickSight dashboards',
+      description: 'QuickSightダッシュボード用セクター横断パフォーマンス比較',
       database: props.glueDatabase.ref,
       queryString: `
 -- セクター間パフォーマンス比較
@@ -219,19 +219,19 @@ ORDER BY total_volume DESC;
     // デプロイ後にAthenaコンソールURLとリソース情報を出力
     new cdk.CfnOutput(this, 'WorkGroupName', {
       value: workgroup.name!,
-      description: 'Athena workgroup name',
+      description: 'Athenaワークグループ名',
       exportName: 'AthenaWorkGroupName',
     });
 
     new cdk.CfnOutput(this, 'QueryResultsLocation', {
       value: `s3://${athenaResultsBucket.bucketName}/query-results/`,
-      description: 'Athena query results S3 location',
+      description: 'Athenaクエリ結果S3保存先',
       exportName: 'AthenaResultsLocation',
     });
 
     new cdk.CfnOutput(this, 'AthenaConsoleUrl', {
       value: `https://${cdk.Aws.REGION}.console.aws.amazon.com/athena/home?region=${cdk.Aws.REGION}#/query-editor`,
-      description: 'Athena console URL',
+      description: 'AthenaコンソールURL',
     });
   }
 }

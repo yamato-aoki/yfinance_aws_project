@@ -51,7 +51,7 @@ export class LambdaStack extends cdk.Stack {
         STOCK_TICKERS: props.stockTickers.join(','),
         TZ: 'Asia/Tokyo',
       },
-      description: 'Fetch previous day stock data from yfinance and save to S3',
+      description: 'yfinanceから前日の株価データを取得してS3に保存',
     });
 
     // ========================================
@@ -61,13 +61,13 @@ export class LambdaStack extends cdk.Stack {
     // 手動実行コマンド: aws lambda invoke --function-name <FunctionName> response.json
     new cdk.CfnOutput(this, 'FunctionName', {
       value: this.fetchStockFunction.functionName,
-      description: 'Lambda function name for stock data fetching',
+      description: '株価データ取得Lambda関数名',
       exportName: 'FetchStockFunctionName',
     });
 
     new cdk.CfnOutput(this, 'FunctionArn', {
       value: this.fetchStockFunction.functionArn,
-      description: 'Lambda function ARN',
+      description: '株価データ取得Lambda関数ARN',
       exportName: 'FetchStockFunctionArn',
     });
   }

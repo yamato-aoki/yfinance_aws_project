@@ -59,7 +59,7 @@ def lambda_handler(event, context):
             bucket = record['s3']['bucket']['name']
             key = urllib.parse.unquote_plus(record['s3']['object']['key'])
             
-            print(f"Processing file: s3://{bucket}/{key}")
+            print(f"ファイル処理中: s3://{bucket}/{key}")
             
             # ========================================
             # 2. CSVファイルをS3から読み込み
@@ -67,7 +67,7 @@ def lambda_handler(event, context):
             response = s3_client.get_object(Bucket=bucket, Key=key)
             df = pd.read_csv(response['Body'])
             
-            print(f"Loaded {len(df)} rows from CSV")
+            print(f"CSV読み込み完了: {len(df)}行")
             
             # ========================================
             # 3. DynamoDBから銘柄マスターデータを取得
@@ -131,19 +131,17 @@ def lambda_handler(event, context):
                 Body=parquet_buffer
             )
             
-            print(f"Saved Parquet to: s3://{PROCESSED_BUCKET}/{output_key}")
-            print(f"Records: {len(df)}, Sector: {sector}, Ticker: {ticker}")
+            print(f"Parquet保存完了: s3://{PROCESSED_BUCKET}/{output_key}")
+            print(f"レコード数: {len(df)}, セクター: {sector}, 銘柄: {ticker}")
         
         return {
             'statusCode': 200,
             'body': json.dumps('Successfully transformed CSV to Parquet')
-        }
+            }
         
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"エラー: {str(e)}")
         raise
-
-
 def get_stock_master_data():
     """
     DynamoDBから銘柄マスターデータを全件取得
@@ -161,9 +159,9 @@ def get_stock_master_data():
             response = table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
             items.extend(response['Items'])
         
-        print(f"Loaded {len(items)} master records from DynamoDB")
+        print(f"DynamoDBからマスターデータを読み込み: {len(items)}件")
         return items
         
     except Exception as e:
-        print(f"Warning: Could not load DynamoDB master data: {str(e)}")
+        print(f"警告: DynamoDBマスターデータの読み込み失敗: {str(e)}")
         return None

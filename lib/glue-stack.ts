@@ -56,7 +56,7 @@ export class GlueStack extends cdk.Stack {
       catalogId: cdk.Aws.ACCOUNT_ID,
       databaseInput: {
         name: 'stock_data_db',
-        description: 'Database for stock price data analysis',
+        description: '株価データ分析用データベース',
       },
     });
 
@@ -125,7 +125,7 @@ export class GlueStack extends cdk.Stack {
     // Athenaでクエリを実行する前にCrawlerを実行する必要がある
     this.glueCrawler = new glue.CfnCrawler(this, 'StockDataCrawler', {
       name: 'stock-data-processed-crawler',
-      description: 'Crawler to catalog processed stock data in Parquet format',
+      description: 'Parquet形式の処理済み株価データをカタログ化するクローラー',
       role: props.glueRole.roleArn,
       databaseName: this.glueDatabase.ref,
       targets: {
@@ -230,30 +230,30 @@ def lambda_handler(event, context):
     // Glueスクリプトのアップロード先も表示
     new cdk.CfnOutput(this, 'GlueDatabaseName', {
       value: this.glueDatabase.ref,
-      description: 'Glue database name',
+      description: 'Glueデータベース名',
       exportName: 'GlueDatabaseName',
     });
 
     new cdk.CfnOutput(this, 'GlueJobName', {
       value: this.glueJob.name!,
-      description: 'Glue ETL job name',
+      description: 'Glue ETLジョブ名',
       exportName: 'GlueJobName',
     });
 
     new cdk.CfnOutput(this, 'GlueCrawlerName', {
       value: this.glueCrawler.name!,
-      description: 'Glue crawler name',
+      description: 'Glueクローラー名',
       exportName: 'GlueCrawlerName',
     });
 
     new cdk.CfnOutput(this, 'S3NotificationStatus', {
       value: s3NotificationEnabled ? 'ENABLED' : 'DISABLED',
-      description: 'S3 event notification status for Glue job trigger',
+      description: 'Glueジョブトリガー用S3イベント通知ステータス',
     });
 
     new cdk.CfnOutput(this, 'GlueScriptLocation', {
       value: `s3://${glueScriptBucket.bucketName}/glue/etl_job.py`,
-      description: 'Upload your Glue ETL script to this location',
+      description: 'GlueETLスクリプトのアップロード先',
     });
   }
 }

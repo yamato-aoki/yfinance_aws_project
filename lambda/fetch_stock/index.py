@@ -90,8 +90,8 @@ def lambda_handler(event, context):
     yesterday = datetime.now() - timedelta(days=1)
     date_str = yesterday.strftime('%Y-%m-%d')
     
-    print(f"Fetching stock data for {date_str}")
-    print(f"Tickers: {tickers}")
+    print(f"株価データ取得開始: {date_str}")
+    print(f"対象銘柄: {tickers}")
     
     # 処理結果を格納する配列
     results = []   # 成功した銘柄のリスト
@@ -102,7 +102,7 @@ def lambda_handler(event, context):
     # ========================================
     for ticker in tickers:
         try:
-            print(f"Fetching data for {ticker}...")
+            print(f"{ticker} のデータ取得中...")
             
             # ========================================
             # 3-1. yfinanceでデータ取得
@@ -114,8 +114,8 @@ def lambda_handler(event, context):
             hist = stock.history(period='2d')
             
             if hist.empty:
-                print(f"No data available for {ticker}")
-                errors.append(f"{ticker}: No data available")
+                print(f"{ticker}: データが取得できませんでした")
+                errors.append(f"{ticker}: データなし")
                 continue
             
             # ========================================
@@ -164,7 +164,7 @@ def lambda_handler(event, context):
                 ContentType='text/csv'
             )
             
-            print(f"Successfully uploaded: s3://{raw_bucket}/{s3_key}")
+            print(f"アップロード成功: s3://{raw_bucket}/{s3_key}")
             results.append({
                 'ticker': ticker,
                 'date': data_date,
@@ -175,7 +175,7 @@ def lambda_handler(event, context):
         except Exception as e:
             # エラーハンドリング: 個別銘柄のエラーで全体処理を停止しない
             error_msg = f"{ticker}: {str(e)}"
-            print(f"Error processing {ticker}: {str(e)}")
+            print(f"{ticker} の処理中にエラー: {str(e)}")
             errors.append(error_msg)
             results.append({
                 'ticker': ticker,
@@ -195,7 +195,7 @@ def lambda_handler(event, context):
         'errors': errors
     }
     
-    print(f"Summary: {response_body['successful']} successful, {response_body['failed']} failed")
+    print(f"処理完了: 成功 {response_body['successful']}件, 失敗 {response_body['failed']}件")
     
     # ========================================
     # 5. レスポンスを返却

@@ -61,7 +61,7 @@ export class AuroraStack extends cdk.Stack {
     // VPC内からのMySQL接続（ポート3306）のみを許可
     const dbSecurityGroup = new ec2.SecurityGroup(this, 'AuroraSecurityGroup', {
       vpc: this.vpc,
-      description: 'Security group for Aurora cluster',
+      description: 'Auroraクラスター用セキュリティグループ',
       allowAllOutbound: true,
     });
 
@@ -131,25 +131,25 @@ export class AuroraStack extends cdk.Stack {
     // デプロイ後に接続情報を確認できるように出力
     new cdk.CfnOutput(this, 'ClusterEndpoint', {
       value: this.cluster.clusterEndpoint.hostname,
-      description: 'Aurora cluster endpoint',
+      description: 'Auroraクラスターエンドポイント',
       exportName: 'AuroraClusterEndpoint',
     });
 
     new cdk.CfnOutput(this, 'ClusterIdentifier', {
       value: this.cluster.clusterIdentifier,
-      description: 'Aurora cluster identifier',
+      description: 'Auroraクラスター識別子',
       exportName: 'AuroraClusterIdentifier',
     });
 
     new cdk.CfnOutput(this, 'SecretArn', {
       value: this.databaseCredentials.secretArn,
-      description: 'Aurora credentials secret ARN',
+      description: 'Aurora認証情報シークレットARN',
       exportName: 'AuroraSecretArn',
     });
 
     new cdk.CfnOutput(this, 'DatabaseName', {
       value: 'stockdb',
-      description: 'Aurora database name',
+      description: 'Auroraデータベース名',
       exportName: 'AuroraDatabaseName',
     });
   }
