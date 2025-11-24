@@ -31,32 +31,7 @@ AWS CDK (TypeScript) を使用して構築する **株価データパイプラ�
 
 ## アーキテクチャ概要
 
-```mermaid
-graph TD
-    EventBridge([EventBridge Scheduler<br/>毎日9:00 JST])
-    YFinance{{yfinance API<br/>外部データソース}}
-    Lambda[Lambda<br/>データ取得]
-    S3Raw[[S3 Raw<br/>CSV]]
-    Transform[Transform<br/>Lambda or Glue]
-    S3Processed[[S3 Processed<br/>Parquet]]
-    LambdaCurated[Lambda<br/>Curated Views自動生成]
-    Crawler[Glue Crawler]
-    Athena[Athena]
-    S3Curated[[S3 Curated<br/>集計ビュー]]
-    MasterDB[(Master DB<br/>DynamoDB or Aurora)]
-
-    EventBridge -.->|定期実行| Lambda
-    YFinance -.->|株価データ| Lambda
-    Lambda --> S3Raw
-    S3Raw -.->|CSV作成時| Transform
-    MasterDB -.->|JOIN| Transform
-    Transform --> S3Processed
-    S3Processed -.->|Parquet作成時| LambdaCurated
-    LambdaCurated -->|CTAS実行| Athena
-    Athena -->|5つのビュー作成| S3Curated
-    S3Processed --> Crawler
-    Crawler -->|カタログ登録| Athena
-```
+![Architecture Diagram](docs/architecture.png)
 
 ---
 
