@@ -286,11 +286,3 @@ yfinance はサンプルデータソースです。Lambda 関数を差し替え�
 <sub>[↑ 目次へ戻る](#目次)</sub>
 
 ---
-
-## 学習ガイド
-
-このプロジェクトを使った効果的な学習手順は [LEARNING_ROADMAP.md](./LEARNING_ROADMAP.md) を参照してください。
-
-<sub>[↑ 目次へ戻る](#目次)</sub>
-
----
