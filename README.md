@@ -45,11 +45,15 @@ AWS CDK (TypeScript) を使用して構築する **株価データパイプラ�
 
 設定は [`bin/stock-etl.ts` L73](./bin/stock-etl.ts#L73) の `useFreeTier` フラグで切り替えできます。
 
+<sub>[↑ 目次へ戻る](#目次)</sub>
+
 ---
 
 ## アーキテクチャ概要
 
 ![Architecture Diagram](docs/architecture.png)
+
+<sub>[↑ 目次へ戻る](#目次)</sub>
 
 ---
 
@@ -63,6 +67,8 @@ AWS CDK (TypeScript) を使用して構築する **株価データパイプラ�
 | カタログ | Glue Crawler | 〃 |
 | 分析 | Athena | 〃 |
 | 月額概算 | **$0** | **$100+** |
+
+<sub>[↑ 目次へ戻る](#目次)</sub>
 
 ---
 
@@ -95,6 +101,8 @@ Processed bucket に Parquet ファイルが作成されると、S3 イベント
 
 **コスト:** 5銘柄×365日で約100KBのParquet → 5クエリで~500KB = **$0.0025/回**（年間$0.91 ≈ 140円）
 
+<sub>[↑ 目次へ戻る](#目次)</sub>
+
 ---
 
 ## データレイク3層構造
@@ -104,6 +112,8 @@ Processed bucket に Parquet ファイルが作成されると、S3 イベント
 | **Raw** | `stock-data-raw` | CSV | yfinance から取得した生データ |
 | **Processed** | `stock-data-processed` | Parquet | マスターJOIN済み、パーティション分割 |
 | **Curated** | `stock-data-curated` | Parquet | セクター別集計、月次サマリー等のビジネスビュー |
+
+<sub>[↑ 目次へ戻る](#目次)</sub>
 
 ---
 
@@ -122,6 +132,8 @@ s3://参照用バケット/
             {銘柄名}{yymmdd}.parquet
 ```
 
+<sub>[↑ 目次へ戻る](#目次)</sub>
+
 ---
 
 ## Parquet カラム仕様
@@ -136,6 +148,8 @@ s3://参照用バケット/
 | sector / exchange / country | マスター（DynamoDB/Aurora）JOIN結果 |
 | ingested_at | 変換処理の実行時間 |
 | source_file | 元 CSV ファイル名 |
+
+<sub>[↑ 目次へ戻る](#目次)</sub>
 
 ---
 
@@ -158,6 +172,8 @@ CREATE TABLE stocks (
 );
 ```
 
+<sub>[↑ 目次へ戻る](#目次)</sub>
+
 ---
 
 ## プロジェクト構造
@@ -175,6 +191,8 @@ yfinance_aws_project/
 ├── sql/                     # Aurora セットアップスクリプト
 └── docs/                    # ドキュメント・図
 ```
+
+<sub>[↑ 目次へ戻る](#目次)</sub>
 
 ---
 
@@ -207,6 +225,8 @@ cdk deploy --all
 mysql -h <aurora-endpoint> -u admin -p stock_data_db < sql/aurora_setup.sql
 ```
 
+<sub>[↑ 目次へ戻る](#目次)</sub>
+
 ---
 
 ## 自動化の有効化
@@ -234,6 +254,8 @@ aws glue start-job-run --job-name stock-etl-job
 aws glue start-crawler --name stock-data-processed-crawler
 ```
 
+<sub>[↑ 目次へ戻る](#目次)</sub>
+
 ---
 
 ## 応用例
@@ -249,6 +271,8 @@ yfinance はサンプルデータソースです。Lambda 関数を差し替え�
 パーティション構造（`sector/ticker/year/month/day`）は、  
 `region/device/year/month/day` や `service/endpoint/year/month/day` 等に置き換え可能です。
 
+<sub>[↑ 目次へ戻る](#目次)</sub>
+
 ---
 
 ## 作者
@@ -259,10 +283,14 @@ yfinance はサンプルデータソースです。Lambda 関数を差し替え�
 - **専門領域**: データ基盤構築 / ETL / クラウド活用 / 再現性ある設計
 - **GitHub**: [@yamato-aoki](https://github.com/yamato-aoki)
 
+<sub>[↑ 目次へ戻る](#目次)</sub>
+
 ---
 
 ## 学習ガイド
 
 このプロジェクトを使った効果的な学習手順は [LEARNING_ROADMAP.md](./LEARNING_ROADMAP.md) を参照してください。
+
+<sub>[↑ 目次へ戻る](#目次)</sub>
 
 ---
