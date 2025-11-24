@@ -120,7 +120,7 @@ s3://参照用バケット/
       year=2024/
         month=11/
           day=24/
-            data.parquet
+            AAPL_2024-11-24.parquet
 ```
 
 ### Parquet カラム例
