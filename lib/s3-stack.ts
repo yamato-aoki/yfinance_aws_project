@@ -16,6 +16,7 @@ export class S3Stack extends cdk.Stack {
   // 他のスタックから参照可能なように public で宣言
   public readonly rawBucket: s3.Bucket;
   public readonly processedBucket: s3.Bucket;
+  public readonly curatedBucket: s3.Bucket;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -69,7 +70,33 @@ export class S3Stack extends cdk.Stack {
     });
 
     // ========================================
-    // 3. Athena Results Bucket（クエリ結果バケット）
+    // 3. Curated Data Bucket（集計ビューバケット）
+    // ========================================
+    // Athenaで作成したセクター別集計ビュー等を保存
+    // ビジネス分析・ダッシュボード用の最終データ
+    this.curatedBucket = new s3.Bucket(this, 'StockDataCuratedBucket', {
+      bucketName: `stock-data-curated-${cdk.Aws.ACCOUNT_ID}`,
+      versioned: false,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
+      lifecycleRules: [
+        {
+          id: 'TransitionToIA',
+          enabled: true,
+          transitions: [
+            {
+              storageClass: s3.StorageClass.INTELLIGENT_TIERING,
+              transitionAfter: cdk.Duration.days(30),
+            },
+          ],
+        },
+      ],
+    });
+
+    // ========================================
+    // 4. Athena Results Bucket（クエリ結果バケット）
     // ========================================
     // Athenaクエリの実行結果を保存（一時的なデータ）
     // 7日後に自動削除される設定
@@ -104,6 +131,12 @@ export class S3Stack extends cdk.Stack {
       value: this.processedBucket.bucketName,
       description: 'S3 bucket for processed stock data (Parquet)',
       exportName: 'StockDataProcessedBucketName',
+    });
+
+    new cdk.CfnOutput(this, 'CuratedBucketName', {
+      value: this.curatedBucket.bucketName,
+      description: 'S3 bucket for curated data (Aggregated views)',
+      exportName: 'StockDataCuratedBucketName',
     });
 
     new cdk.CfnOutput(this, 'AthenaResultsBucketName', {
