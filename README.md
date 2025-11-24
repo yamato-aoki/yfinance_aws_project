@@ -311,8 +311,12 @@ yfinance はサンプルデータソースです。Lambda 関数を差し替え�
 
 ---
 
-## ライセンス
+## 作者
 
-MIT License
+**青木 大和（Yamato Aoki）**
+
+- **職種**: データエンジニア
+- **専門領域**: データ基盤構築 / ETL / クラウド活用 / 再現性ある設計
+- **GitHub**: [@yamato-aoki](https://github.com/yamato-aoki)
 
 ---
