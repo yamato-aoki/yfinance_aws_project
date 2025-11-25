@@ -1,7 +1,7 @@
 # yfinance AWS Data Pipeline Project
 
 AWS CDK (TypeScript) を使用して構築する **株価データパイプライン学習プロジェクト**。  
-実務でよくある「S3 にログ、Aurora にマスター」という構造を、株価データを題材に再現したテンプレートです。
+「S3 にログ、Aurora にマスター」という構造を、株価データを題材に再現したテンプレートです。
 
 [![CDK Version](https://img.shields.io/badge/AWS_CDK-2.120.0-orange)](https://github.com/aws/aws-cdk)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3.0-blue)](https://www.typescriptlang.org/)
